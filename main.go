@@ -16,13 +16,13 @@ func trace(wg *sync.WaitGroup, i int) {
 	defer wg.Done()
 	hops, err := Trace(net.ParseIP(rIp[i]))
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	for _, h := range hops {
 		for _, n := range h.Nodes {
 			ip, err := LookupIP(n.IP.String())
 			if err != nil {
-				log.Fatal(err)
+				continue
 			}
 			if ip.Country == "CN" {
 				c := color.New(ca[i]).Add(color.Bold).SprintFunc()
