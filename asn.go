@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"io"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 )
@@ -26,6 +29,31 @@ type ASN struct {
 	Registry  string `json:"registry"`
 	Allocated string `json:"allocated"`
 	ASName    string `json:"as_name"`
+}
+
+type IpInfo struct {
+	Ip      string `json:"ip"`
+	Country string `json:"country"`
+	Org     string `json:"org"`
+}
+
+func lookupIpInfo(ip string) (*IpInfo, error) {
+	get, err := http.Get("http://ipinfo.io/" + ip)
+	if err != nil {
+		return nil, err
+	}
+	body, err := io.ReadAll(get.Body)
+	if err != nil {
+		return nil, err
+	}
+	//log.Println(string(body))
+	ipInfo := IpInfo{}
+	err = json.Unmarshal(body, &ipInfo)
+	if err != nil {
+		return nil, err
+	}
+	ipInfo.Org = strings.Split(ipInfo.Org, " ")[0]
+	return &ipInfo, nil
 }
 
 const hexDigit = "0123456789abcdef"

@@ -9,5 +9,5 @@ fi
 
 tar -xf backtrace.tar.gz
 rm backtrace.tar.gz
-mv backtrace /usr/local/bin/
+mv backtrace /usr/bin/
 backtrace
