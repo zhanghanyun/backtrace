@@ -18,7 +18,7 @@ import (
 var DefaultConfig = Config{
 	Delay:    50 * time.Millisecond,
 	Timeout:  500 * time.Millisecond,
-	MaxHops:  30,
+	MaxHops:  15,
 	Count:    1,
 	Networks: []string{"ip4:icmp", "ip4:ip"},
 }

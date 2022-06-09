@@ -1,188 +1,66 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"io"
+	"github.com/fatih/color"
 	"net"
-	"net/http"
-	"strconv"
 	"strings"
 )
 
-// IP holds the BGP origin information about a given IP address.
-type IP struct {
-	ASNum     uint32 `json:"as_num"`
-	IP        string `json:"ip"`
-	BGPPrefix string `json:"bgp_prefix"`
-	Country   string `json:"country"`
-	Registry  string `json:"registry"`
-	Allocated string `json:"allocated"`
-	ASName    string `json:"as_name"`
-}
-
-// ASN holds the description of a BGP ASN.
-type ASN struct {
-	ASNum     uint32 `json:"as_num"`
-	Country   string `json:"country"`
-	Registry  string `json:"registry"`
-	Allocated string `json:"allocated"`
-	ASName    string `json:"as_name"`
-}
-
-type IpInfo struct {
-	Ip      string `json:"ip"`
-	Country string `json:"country"`
-	Org     string `json:"org"`
-}
-
-func lookupIpInfo(ip string) (*IpInfo, error) {
-	get, err := http.Get("http://ipinfo.io/" + ip)
-	if err != nil {
-		return nil, err
-	}
-	body, err := io.ReadAll(get.Body)
-	if err != nil {
-		return nil, err
-	}
-	//log.Println(string(body))
-	ipInfo := IpInfo{}
-	err = json.Unmarshal(body, &ipInfo)
-	if err != nil {
-		return nil, err
-	}
-	ipInfo.Org = strings.Split(ipInfo.Org, " ")[0]
-	return &ipInfo, nil
-}
-
-const hexDigit = "0123456789abcdef"
-
-func reverseaddr(addr string) (string, error) {
-	ip := net.ParseIP(addr)
-	if ip == nil {
-		return "", fmt.Errorf("unrecognized address: %s", addr)
-	}
-	if v4 := ip.To4(); v4 != nil {
-		buf := make([]byte, 0, net.IPv4len*4)
-		// Add it, in reverse, to the buffer
-		for i := len(v4) - 1; i >= 0; i-- {
-			buf = strconv.AppendInt(buf, int64(v4[i]), 10)
-			// Only append a trailing "." if this isn't the final octet
-			if i > 0 {
-				buf = append(buf, '.')
-			}
-		}
-		return string(buf), nil
-	}
-
-	buf := make([]byte, 0, net.IPv6len*4)
-	for i := len(ip) - 1; i >= 0; i-- {
-		v := ip[i]
-		buf = append(buf, hexDigit[v&0xF])
-		buf = append(buf, '.')
-		buf = append(buf, hexDigit[v>>4])
-		if i > 0 {
-			buf = append(buf, '.')
-		}
-	}
-	return string(buf), nil
-}
-
-// Parse the text output from the IP to ASN service and return an IP.
-func parseOrigin(txt string) (IP, error) {
-	fields := strings.Split(txt, "|")
-	for i := range fields {
-		fields[i] = strings.TrimSpace(fields[i])
-	}
-
-	asn, err := strconv.ParseUint(fields[0], 10, 32)
-	if err != nil && fields[0] != "NA" {
-		return IP{}, errors.Wrap(err, "AS parsing failed")
-	}
-
-	return IP{
-		ASNum:     uint32(asn),
-		BGPPrefix: fields[1],
-		Country:   fields[2],
-		Registry:  fields[3],
-		Allocated: fields[4],
-	}, nil
+type Result struct {
+	i int
+	s string
 }
 
 var (
-	originV4 = "origin.asn.cymru.com"
-	originV6 = "origin6.asn.cymru.com"
+	rIp   = []string{"219.141.136.12", "202.106.50.1", "221.179.155.161", "202.96.209.133", "210.22.97.1", "211.136.112.200", "58.60.188.222", "210.21.196.6", "120.196.165.24"}
+	rName = []string{"北京电信", "北京联通", "北京移动", "上海电信", "上海联通", "上海移动", "广州电信", "广州联通", "广州移动"}
+	ca    = []color.Attribute{color.FgHiBlue, color.FgHiMagenta, color.FgHiYellow, color.FgHiGreen, color.FgHiCyan, color.FgHiRed, color.FgHiMagenta, color.FgHiYellow, color.FgHiBlue}
+	m     = map[string]string{"AS4134": "电信163 [普通线路]", "AS4809": "电信CN2 [优质线路]", "AS4837": "联通4837[普通线路]", "AS9929": "联通9929[优质线路]", "AS9808": "移动CMI [普通线路]", "AS58453": "移动CMI [普通线路]"}
 )
 
-// LookupIP queries Team Cymru's IP to ASN mapping service and returns BGP
-// origin information about the IP.
-func LookupIP(ip string) (IP, error) {
-	rev, err := reverseaddr(ip)
+func trace(ch chan Result, i int) {
+
+	hops, err := Trace(net.ParseIP(rIp[i]))
 	if err != nil {
-		return IP{}, errors.Wrap(err, "reversing IP failed")
+		s := fmt.Sprintf("%v %-15s %v", rName[i], rIp[i], err)
+		ch <- Result{i, s}
+		return
 	}
 
-	var zone string
-	parsedIP := net.ParseIP(ip)
-	if v4 := parsedIP.To4(); v4 != nil {
-		zone = originV4
-	} else {
-		zone = originV6
+	for _, h := range hops {
+		for _, n := range h.Nodes {
+			asn := ipAsn(n.IP.String())
+			if asn == "" {
+				continue
+			} else {
+				as := m[asn]
+				c := color.New(ca[i]).Add(color.Bold).SprintFunc()
+				s := fmt.Sprintf("%v %-15s %-23s", rName[i], rIp[i], c(as))
+				ch <- Result{i, s}
+				return
+			}
+		}
 	}
 
-	q := fmt.Sprintf("%s.%s.", rev, zone)
-	recs, err := net.LookupTXT(q)
-	if err != nil {
-		return IP{}, errors.Wrap(err, "DNS lookup failed")
-	}
-
-	origin, err := parseOrigin(recs[0])
-	if err != nil {
-		return IP{}, errors.Wrap(err, "parse failed")
-	}
-	origin.IP = ip
-	if asn, err := LookupASN(fmt.Sprintf("AS%d", origin.ASNum)); err == nil {
-		origin.ASName = asn.ASName
-	}
-
-	return origin, nil
+	s := fmt.Sprintf("%v %-15s %v", rName[i], rIp[i], "测试超时")
+	ch <- Result{i, s}
 }
 
-// Parse the text output from the IP to ASN service and return an ASN.
-func parseASN(txt string) (ASN, error) {
-	fields := strings.Split(txt, "|")
-	for i := range fields {
-		fields[i] = strings.TrimSpace(fields[i])
-	}
+func ipAsn(ip string) string {
 
-	asn, err := strconv.ParseUint(fields[0], 10, 32)
-	if err != nil && fields[0] != "NA" {
-		return ASN{}, errors.Wrap(err, "AS parsing failed")
+	switch {
+	case strings.HasPrefix(ip, "59.43"):
+		return "AS4809"
+	case strings.HasPrefix(ip, "202.97"):
+		return "AS4134"
+	case strings.HasPrefix(ip, "218.105") || strings.HasPrefix(ip, "210.51"):
+		return "AS9929"
+	case strings.HasPrefix(ip, "219.158"):
+		return "AS4837"
+	case strings.HasPrefix(ip, "223.118") || strings.HasPrefix(ip, "223.119") || strings.HasPrefix(ip, "223.120") || strings.HasPrefix(ip, "223.121"):
+		return "AS58453"
+	default:
+		return ""
 	}
-
-	return ASN{
-		ASNum:     uint32(asn),
-		Country:   fields[1],
-		Registry:  fields[2],
-		Allocated: fields[3],
-		ASName:    fields[4],
-	}, nil
-}
-
-// LookupASN queries the IP to ASN service to fetch an AS description.
-func LookupASN(asn string) (ASN, error) {
-	if strings.ToLower(asn[0:2]) != "as" {
-		asn = "AS" + asn
-	}
-	q := fmt.Sprintf("%s.asn.cymru.com.", asn)
-	res, err := net.LookupTXT(q)
-	if err != nil {
-		return ASN{}, errors.Wrap(err, "DNS lookup failed")
-	}
-	as, err := parseASN(res[0])
-	if err != nil {
-		return ASN{}, errors.Wrap(err, "parse failed")
-	}
-	return as, nil
 }
