@@ -13,9 +13,9 @@ type Result struct {
 }
 
 var (
-	rIp   = []string{"219.141.136.12", "202.106.50.1", "221.179.155.161", "202.96.209.133", "210.22.97.1", "211.136.112.200", "58.60.188.222", "210.21.196.6", "120.196.165.24"}
-	rName = []string{"北京电信", "北京联通", "北京移动", "上海电信", "上海联通", "上海移动", "广州电信", "广州联通", "广州移动"}
-	ca    = []color.Attribute{color.FgHiBlue, color.FgHiMagenta, color.FgHiYellow, color.FgHiGreen, color.FgHiCyan, color.FgHiRed, color.FgHiMagenta, color.FgHiYellow, color.FgHiBlue}
+	rIp   = []string{"219.141.136.12", "202.106.50.1", "221.179.155.161", "202.96.209.133", "210.22.97.1", "211.136.112.200", "58.60.188.222", "210.21.196.6", "120.196.165.24", "61.139.2.69", "119.6.6.6", "211.137.96.205"}
+	rName = []string{"北京电信", "北京联通", "北京移动", "上海电信", "上海联通", "上海移动", "广州电信", "广州联通", "广州移动", "成都电信", "成都联通", "成都移动"}
+	ca    = []color.Attribute{color.FgHiYellow, color.FgHiMagenta, color.FgHiBlue, color.FgHiGreen, color.FgHiCyan, color.FgHiRed}
 	m     = map[string]string{"AS4134": "电信163 [普通线路]", "AS4809": "电信CN2 [优质线路]", "AS4837": "联通4837[普通线路]", "AS9929": "联通9929[优质线路]", "AS9808": "移动CMI [普通线路]", "AS58453": "移动CMI [普通线路]"}
 )
 
@@ -35,7 +35,8 @@ func trace(ch chan Result, i int) {
 				continue
 			} else {
 				as := m[asn]
-				c := color.New(ca[i]).Add(color.Bold).SprintFunc()
+				cai := i % 6
+				c := color.New(ca[cai]).Add(color.Bold).SprintFunc()
 				s := fmt.Sprintf("%v %-15s %-23s", rName[i], rIp[i], c(as))
 				ch <- Result{i, s}
 				return
