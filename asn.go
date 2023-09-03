@@ -13,17 +13,19 @@ type Result struct {
 }
 
 var (
-	rIp   = []string{"219.141.136.12", "202.106.50.1", "221.179.155.161", "202.96.209.133", "210.22.97.1", "211.136.112.200", "58.60.188.222", "210.21.196.6", "120.196.165.24", "61.139.2.69", "119.6.6.6", "211.137.96.205"}
-	rName = []string{"北京电信", "北京联通", "北京移动", "上海电信", "上海联通", "上海移动", "广州电信", "广州联通", "广州移动", "成都电信", "成都联通", "成都移动"}
-	ca    = []color.Attribute{color.FgHiYellow, color.FgHiMagenta, color.FgHiBlue, color.FgHiGreen, color.FgHiCyan, color.FgHiRed}
-	m     = map[string]string{"AS4134": "电信163 [普通线路]", "AS4809": "电信CN2 [优质线路]", "AS4837": "联通4837[普通线路]", "AS9929": "联通9929[优质线路]", "AS9808": "移动CMI [普通线路]", "AS58453": "移动CMI [普通线路]"}
+	ips = []string{"219.141.136.12", "202.106.50.1", "221.179.155.161", "202.96.209.133", "210.22.97.1",
+		"211.136.112.200", "58.60.188.222", "210.21.196.6", "120.196.165.24", "61.139.2.69", "119.6.6.6",
+		"211.137.96.205"}
+	names = []string{"北京电信", "北京联通", "北京移动", "上海电信", "上海联通", "上海移动", "广州电信", "广州联通", "广州移动",
+		"成都电信", "成都联通", "成都移动"}
+	m = map[string]string{"AS4134": "电信163 [普通线路]", "AS4809": "电信CN2 [优质线路]", "AS4837": "联通4837[普通线路]", "AS9929": "联通9929[优质线路]", "AS9808": "移动CMI [普通线路]", "AS58453": "移动CMI [普通线路]"}
 )
 
 func trace(ch chan Result, i int) {
 
-	hops, err := Trace(net.ParseIP(rIp[i]))
+	hops, err := Trace(net.ParseIP(ips[i]))
 	if err != nil {
-		s := fmt.Sprintf("%v %-15s %v", rName[i], rIp[i], err)
+		s := fmt.Sprintf("%v %-15s %v", names[i], ips[i], err)
 		ch <- Result{i, s}
 		return
 	}
@@ -31,20 +33,26 @@ func trace(ch chan Result, i int) {
 	for _, h := range hops {
 		for _, n := range h.Nodes {
 			asn := ipAsn(n.IP.String())
-			if asn == "" {
+			as := m[asn]
+			var c func(a ...interface{}) string
+			switch asn {
+			case "":
 				continue
-			} else {
-				as := m[asn]
-				cai := i % 6
-				c := color.New(ca[cai]).Add(color.Bold).SprintFunc()
-				s := fmt.Sprintf("%v %-15s %-23s", rName[i], rIp[i], c(as))
-				ch <- Result{i, s}
-				return
+			case "AS9929":
+				c = color.New(color.FgHiBlue).Add(color.Bold).SprintFunc()
+			case "AS4809":
+				c = color.New(color.FgHiMagenta).Add(color.Bold).SprintFunc()
+			default:
+				c = color.New(color.FgWhite).Add(color.Bold).SprintFunc()
 			}
+
+			s := fmt.Sprintf("%v %-15s %-23s", names[i], ips[i], c(as))
+			ch <- Result{i, s}
+			return
 		}
 	}
-
-	s := fmt.Sprintf("%v %-15s %v", rName[i], rIp[i], "测试超时")
+	c := color.New(color.FgRed).Add(color.Bold).SprintFunc()
+	s := fmt.Sprintf("%v %-15s %v", names[i], ips[i], c("测试超时"))
 	ch <- Result{i, s}
 }
 
