@@ -30,20 +30,14 @@ func main() {
 	}()
 
 	yellow := color.New(color.FgHiYellow).Add(color.Bold).SprintFunc()
-	green := color.New(color.FgGreen).SprintFunc()
-	cyan := color.New(color.FgCyan).SprintFunc()
-	blue := color.New(color.FgBlue).SprintFunc()
-	log.Println(blue("正在测试三网回程路由"))
+	green := color.New(color.FgHiGreen).SprintFunc()
+	cyan := color.New(color.FgHiCyan).SprintFunc()
+	log.Println("正在测试三网回程路由...")
 
-	rsp, err := http.Get("http://ipinfo.io")
-	if err != nil {
-		log.Fatalln("Get ip info err", err)
-	}
+	rsp, _ := http.Get("http://ipinfo.io")
 	info := IpInfo{}
-	err = json.NewDecoder(rsp.Body).Decode(&info)
-	if err != nil {
-		log.Fatalln("json decode err", err)
-	}
+	json.NewDecoder(rsp.Body).Decode(&info)
+
 	fmt.Println(green("国家: ") + cyan(info.Country) + green(" 城市: ") + cyan(info.City) + green(" 服务商: ") + cyan(info.Org))
 	fmt.Println(green("项目地址:"), yellow("https://github.com/zhanghanyun/backtrace"))
 
